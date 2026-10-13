@@ -1,6 +1,6 @@
 package com.emirozgen.parking.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -10,9 +10,9 @@ public final class ParkingTicket {
     private final Vehicle vehicle;
     private final ParkingSpot spot;
     private final int floorNumber;
-    private final LocalDateTime entryTime;
+    private final Instant entryTime;
 
-    public ParkingTicket(Vehicle vehicle, ParkingSpot spot, int floorNumber, LocalDateTime entryTime) {
+    public ParkingTicket(Vehicle vehicle, ParkingSpot spot, int floorNumber, Instant entryTime) {
         this.vehicle = Objects.requireNonNull(vehicle, "Araç boş olamaz!");
         this.spot = Objects.requireNonNull(spot, "Park yeri boş olamaz!");
         this.entryTime = Objects.requireNonNull(entryTime, "Giriş zamanı boş olamaz!");
@@ -36,7 +36,7 @@ public final class ParkingTicket {
         return floorNumber;
     }
 
-    public LocalDateTime getEntryTime() {
+    public Instant getEntryTime() {
         return entryTime;
     }
 
