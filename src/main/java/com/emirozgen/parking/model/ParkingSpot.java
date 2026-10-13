@@ -56,6 +56,19 @@ public class ParkingSpot {
         this.parkedVehicle = vehicle;
     }
 
+    /**
+     * Kontrol ve yerleştirmeyi tek kilit altında yapar; yer bu arada başka thread'e
+     * gittiyse exception yerine false döner, böylece çağıran yeni yer arayabilir.
+     */
+    public synchronized boolean tryPark(Vehicle vehicle) {
+        Objects.requireNonNull(vehicle, "Araç boş olamaz!");
+        if (!canFit(vehicle)) {
+            return false;
+        }
+        this.parkedVehicle = vehicle;
+        return true;
+    }
+
     public synchronized Vehicle release() {
         if (!isOccupied()) {
             throw new IllegalStateException(id + " yeri zaten boş!");
