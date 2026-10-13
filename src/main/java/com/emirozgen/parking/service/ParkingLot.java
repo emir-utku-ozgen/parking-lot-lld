@@ -9,6 +9,7 @@ import com.emirozgen.parking.model.ParkingTicket;
 import com.emirozgen.parking.model.Receipt;
 import com.emirozgen.parking.model.SpotSize;
 import com.emirozgen.parking.model.Vehicle;
+import com.emirozgen.parking.observer.ParkingEventListener;
 import com.emirozgen.parking.strategy.fee.FeeStrategy;
 import com.emirozgen.parking.strategy.spot.ParkingStrategy;
 import com.emirozgen.parking.strategy.spot.SpotAssignment;
@@ -21,12 +22,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * Otoparkın dış dünyaya açılan tek kapısı (Facade): kat, yer, strateji ve
  * bilet yönetimini park/unpark çağrılarının arkasına saklar.
  */
 public class ParkingLot {
+
+    private static final System.Logger LOG = System.getLogger(ParkingLot.class.getName());
 
     private final List<ParkingFloor> floors;
     private final ParkingStrategy parkingStrategy;
@@ -35,6 +40,7 @@ public class ParkingLot {
 
     private final Map<String, ParkingTicket> activeTicketsById = new ConcurrentHashMap<>();
     private final Map<String, ParkingTicket> activeTicketsByPlate = new ConcurrentHashMap<>();
+    private final List<ParkingEventListener> listeners = new CopyOnWriteArrayList<>();
 
     public ParkingLot(List<ParkingFloor> floors, ParkingStrategy parkingStrategy,
                       FeeStrategy feeStrategy, Clock clock) {
@@ -64,6 +70,7 @@ public class ParkingLot {
             throw new VehicleAlreadyParkedException(plate + " plakalı araç zaten otoparkta!");
         }
         activeTicketsById.put(ticket.getTicketId(), ticket);
+        notifyListeners(listener -> listener.onVehicleParked(ticket));
         return ticket;
     }
 
@@ -84,7 +91,17 @@ public class ParkingLot {
         }
         activeTicketsByPlate.remove(ticket.getVehicle().getLicensePlate(), ticket);
         ticket.getSpot().release();
-        return new Receipt(ticket, exitTime, fee);
+        Receipt receipt = new Receipt(ticket, exitTime, fee);
+        notifyListeners(listener -> listener.onVehicleLeft(receipt));
+        return receipt;
+    }
+
+    public void addListener(ParkingEventListener listener) {
+        listeners.add(Objects.requireNonNull(listener, "Dinleyici boş olamaz!"));
+    }
+
+    public void removeListener(ParkingEventListener listener) {
+        listeners.remove(listener);
     }
 
     public Optional<ParkingTicket> findActiveTicket(String licensePlate) {
@@ -99,6 +116,20 @@ public class ParkingLot {
 
     public List<ParkingFloor> getFloors() {
         return floors;
+    }
+
+    /**
+     * Olay, durum değişikliği tamamlandıktan sonra yayınlanır. Bir dinleyicinin hatası
+     * ne park/çıkış işlemini ne de diğer dinleyicileri etkiler.
+     */
+    private void notifyListeners(Consumer<ParkingEventListener> event) {
+        for (ParkingEventListener listener : listeners) {
+            try {
+                event.accept(listener);
+            } catch (RuntimeException e) {
+                LOG.log(System.Logger.Level.WARNING, "Dinleyici hata verdi: " + listener, e);
+            }
+        }
     }
 
     /**
